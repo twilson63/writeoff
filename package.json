@@ -1,0 +1,32 @@
+{
+  "name": "writeoff",
+  "version": "1.0.0",
+  "description": "CLI tool that benchmarks LLM writing capabilities by generating blog posts from multiple models and having LLM judges evaluate them",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "writeoff": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["cli", "llm", "benchmark", "writing", "ai"],
+  "license": "MIT",
+  "dependencies": {
+    "ai": "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/anthropic": "^1.0.0",
+    "commander": "^12.0.0",
+    "cli-progress": "^3.12.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/cli-progress": "^3.11.0",
+    "tsx": "^4.0.0"
+  }
+}

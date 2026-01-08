@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# Results (keep structure but ignore content)
+results/*
+!results/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Content files (generated/temporary)
+*.md
+*.txt
+*.html
+transcript.json
+
+# Except these specific docs
+!writeoff.md
+!zenbin.md
+!judges.md
