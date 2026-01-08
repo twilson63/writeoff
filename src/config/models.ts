@@ -9,9 +9,14 @@ import { ModelConfig } from '../types/index.js';
  */
 export const MODEL_ID_MAP: Record<string, string> = {
   'gemini-flash': 'google/gemini-2.5-flash',
-  'kimi-k2': 'moonshotai/kimi-k2-thinking',
+  'gemini-3-flash-preview': 'google/gemini-3-flash-preview',
+  'kimi-k2': 'moonshotai/kimi-k2',
+  'kimi-k2-thinking': 'moonshotai/kimi-k2-thinking',
   'gpt-5.2': 'openai/gpt-5.2',
+  'gpt-5.2-thinking': 'openai/gpt-5.2-thinking',
   'claude-opus-4': 'claude-opus-4-0520',
+  'claude-opus-4.5': 'anthropic/claude-opus-4.5',
+  'opus-4.5': 'anthropic/claude-opus-4.5',
 };
 
 /**
@@ -29,19 +34,19 @@ const REVERSE_MODEL_MAP: Record<string, string> = Object.fromEntries(
  * Default writer models in provider:model format
  */
 export const DEFAULT_WRITER_MODELS: string[] = [
-  'openrouter:google/gemini-2.5-flash',
-  'openrouter:moonshotai/kimi-k2-thinking',
   'openrouter:openai/gpt-5.2',
-  'anthropic:claude-opus-4-0520',
+  'openrouter:anthropic/claude-opus-4.5',
+  'openrouter:google/gemini-3-flash-preview',
 ];
 
 /**
  * Default judge models in provider:model format
  */
 export const DEFAULT_JUDGE_MODELS: string[] = [
-  'openrouter:google/gemini-2.5-flash',
+  'openrouter:openai/gpt-5.2',
   'openrouter:moonshotai/kimi-k2-thinking',
-  'anthropic:claude-opus-4-0520',
+  'openrouter:google/gemini-3-flash-preview',
+  'openrouter:anthropic/claude-opus-4.5',
 ];
 
 // =============================================================================

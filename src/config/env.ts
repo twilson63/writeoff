@@ -9,9 +9,10 @@ const DEFAULT_WRITER_MODELS = [
 ];
 
 const DEFAULT_JUDGE_MODELS = [
-  'openrouter:google/gemini-2.5-flash',
+  'openrouter:openai/gpt-5.2',
   'openrouter:moonshotai/kimi-k2-thinking',
-  'anthropic:claude-opus-4-0520',
+  'openrouter:google/gemini-3-flash-preview',
+  'openrouter:anthropic/claude-opus-4.5',
 ];
 
 let envLoaded = false;
