@@ -51,6 +51,35 @@ export function getAnthropicApiKey(): string | undefined {
   return process.env.ANTHROPIC_API_KEY;
 }
 
+function parsePositiveIntEnv(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (!raw) return defaultValue;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
+/**
+ * Maximum number of concurrent LLM requests.
+ */
+export function getMaxConcurrency(): number {
+  return parsePositiveIntEnv('WRITEOFF_MAX_CONCURRENCY', 5);
+}
+
+/**
+ * Maximum number of retries for transient model/provider failures.
+ */
+export function getMaxRetries(): number {
+  return parsePositiveIntEnv('WRITEOFF_MAX_RETRIES', 2);
+}
+
+export function getRetryBaseMs(): number {
+  return parsePositiveIntEnv('WRITEOFF_RETRY_BASE_MS', 500);
+}
+
+export function getRetryMaxMs(): number {
+  return parsePositiveIntEnv('WRITEOFF_RETRY_MAX_MS', 8000);
+}
+
 /**
  * Parse a comma-separated model string into an array.
  * Format: "provider:model-id,provider:model-id"

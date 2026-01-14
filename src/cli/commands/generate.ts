@@ -93,6 +93,14 @@ async function saveSessionOutputs(
     );
   }
 
+  if (session.judgeFailures.length > 0) {
+    await writeFile(
+      path.join(sessionDir, 'judge-failures.json'),
+      JSON.stringify(session.judgeFailures, null, 2),
+      'utf-8'
+    );
+  }
+
   // Save full session summary
   await writeFile(
     path.join(sessionDir, 'summary.json'),
@@ -129,16 +137,25 @@ export function createGenerateCommand(): Command {
           process.exit(1);
         }
 
-        // Determine the prompt
+        // Determine the prompt and optional existing content
         let prompt: string;
+        let existingContent: string | undefined;
         let inputFile: string | undefined;
-
+ 
         if (options.input) {
-          // Read prompt from file
           try {
             inputFile = path.resolve(options.input);
-            prompt = await readFile(inputFile, 'utf-8');
-            prompt = prompt.trim();
+            const fileContent = (await readFile(inputFile, 'utf-8')).trim();
+
+            // If both a prompt argument and --input are provided, treat the file as an existing draft
+            // and the CLI argument as the improvement prompt/topic.
+            if (promptArg && promptArg.trim().length > 0) {
+              existingContent = fileContent;
+              prompt = promptArg;
+            } else {
+              // Backwards compatible behavior: --input alone is a prompt file.
+              prompt = fileContent;
+            }
           } catch (error) {
             const err = error as NodeJS.ErrnoException;
             if (err.code === 'ENOENT') {
@@ -155,6 +172,7 @@ export function createGenerateCommand(): Command {
           console.error('Provide a prompt as an argument or use --input <file> to read from a file.');
           process.exit(1);
         }
+
 
         if (!prompt) {
           console.error('Error: Prompt cannot be empty.');
@@ -212,7 +230,7 @@ export function createGenerateCommand(): Command {
         const posts: WriterResult[] = await generatePostsFromModels(
           writerModels,
           prompt,
-          undefined,
+          existingContent,
           (model, status) => {
             if (status === 'done') {
               writerProgress.increment(model);
@@ -236,7 +254,7 @@ export function createGenerateCommand(): Command {
         const judgeProgress = createJudgeProgress(totalJudgments);
         judgeProgress.start();
 
-        const judgments: JudgmentResult[] = await judgeAllPosts(
+        const judged = await judgeAllPosts(
           judgeModels,
           posts,
           (judge: string, post: string, status: 'start' | 'done' | 'error') => {
@@ -247,14 +265,20 @@ export function createGenerateCommand(): Command {
             }
           }
         );
-
+ 
+        const judgments: JudgmentResult[] = judged.judgments;
+        const judgeFailures = judged.failures;
+ 
         judgeProgress.stop();
-        console.log(`Completed ${judgments.length}/${totalJudgments} judgments.\n`);
-
+        console.log(
+          `Completed ${judgments.length}/${totalJudgments} judgments (${judgeFailures.length} failed).\n`
+        );
+ 
         if (judgments.length === 0) {
           console.error('Error: No judgments were completed. Check your API keys and model configurations.');
           process.exit(1);
         }
+
 
         // Phase 3: Aggregate results
         console.log('Phase 3: Aggregating results...');
@@ -268,6 +292,7 @@ export function createGenerateCommand(): Command {
           inputFile,
           posts,
           judgments,
+          judgeFailures,
           results,
           winner,
           createdAt: new Date(),

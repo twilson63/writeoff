@@ -14,7 +14,7 @@ export const JUDGE_OUTPUT_SCHEMA = {
         properties: {
           criterion: {
             type: "string",
-            enum: ["narrative", "structure", "audienceFit", "aiDetection"],
+            enum: ["narrative", "structure", "audienceFit", "accuracy", "aiDetection"],
           },
           score: {
             type: "number",
@@ -27,8 +27,8 @@ export const JUDGE_OUTPUT_SCHEMA = {
         },
         required: ["criterion", "score", "feedback"],
       },
-      minItems: 4,
-      maxItems: 4,
+      minItems: 5,
+      maxItems: 5,
     },
     overallScore: {
       type: "number",
@@ -41,7 +41,7 @@ export const JUDGE_OUTPUT_SCHEMA = {
 } as const;
 
 export interface JudgeScore {
-  criterion: "narrative" | "structure" | "audienceFit" | "aiDetection";
+  criterion: "narrative" | "structure" | "audienceFit" | "accuracy" | "aiDetection";
   score: number;
   feedback: string;
 }
@@ -54,13 +54,15 @@ export interface JudgeOutput {
 export function getJudgePrompt(postContent: string): string {
   return `Evaluate the following blog post against these criteria:
 
-1. **Narrative Flow (weight: 40%)**: Does the post tell a compelling story? Are transitions smooth? Does it maintain reader interest throughout?
+1. **Narrative Flow (weight: 30%)**: Does the post tell a compelling story? Are transitions smooth? Does it maintain reader interest throughout?
 
-2. **Structure (weight: 25%)**: Is the post well-organized? Does it have a clear introduction, body, and conclusion? Is the length appropriate?
+2. **Structure (weight: 20%)**: Is the post well-organized? Does it have a clear introduction, body, and conclusion? Is the length appropriate?
 
 3. **Audience Fit (weight: 20%)**: Is the content appropriate for the target audience? Is the tone consistent? Is it both entertaining and educational?
 
-4. **AI Detection (weight: 15%)**: Does the writing feel natural and human? Score LOWER if you detect these common AI writing patterns.
+4. **Accuracy (weight: 15%)**: Are claims grounded and non-misleading? Penalize exaggeration and invented specifics presented as fact. If the post uses an invented or exaggerated example, it must clearly label it as hypothetical (e.g., "Hypothetical:" / "Imagine...") and keep it realistic.
+
+5. **AI Detection (weight: 15%)**: Does the writing feel natural and human? Score LOWER if you detect these common AI writing patterns.
 
    The most obvious tell is **excessive em dashes**. LLMs lean on em dashes for parenthetical asides because they're trained on heavily edited prose. Human writers use them occasionally, but AI scatters them everywhere. One or two in a post is fine; five or more is a red flag. Commas, semicolons, or even parentheses are what most people actually reach for.
 
@@ -93,8 +95,13 @@ ${postContent}
 ---
 
 Provide your evaluation as a JSON object with:
-- "scores": an array of 4 objects, each with "criterion" (one of: "narrative", "structure", "audienceFit", "aiDetection"), "score" (1-100), and "feedback" (specific, actionable feedback)
+- "scores": an array of 5 objects, each with "criterion" (one of: "narrative", "structure", "audienceFit", "accuracy", "aiDetection"), "score" (1-100), and "feedback" (specific, actionable feedback)
 - "overallScore": the weighted average based on the weights above
+
+Return JSON only:
+- No code fences
+- No Markdown
+- No additional commentary outside the JSON object
 
 Be specific in your feedback. Point to exact passages when possible.`;
 }

@@ -86,22 +86,27 @@ export function createJudgeCommand(): Command {
 
         let completedJudgments = 0;
 
-        // Judge the post with all judges
-        let judgments: JudgmentResult[];
-        try {
-          judgments = await judgePostWithMultipleJudges(
-            judgeModels,
-            mockPost,
-            (judge, status) => {
-              if (status === 'done') {
-                completedJudgments++;
-                progress.update(completedJudgments, judge);
-              }
+        // Judge the post with all judges (partial results allowed)
+        const judged = await judgePostWithMultipleJudges(
+          judgeModels,
+          mockPost,
+          (judge, status) => {
+            if (status === 'done') {
+              completedJudgments++;
+              progress.update(completedJudgments, judge);
+            } else if (status === 'error') {
+              completedJudgments++;
+              progress.update(completedJudgments, `${judge} (failed)`);
             }
-          );
-        } catch (error) {
+          }
+        );
+
+        const judgments: JudgmentResult[] = judged.judgments;
+        const judgeFailures = judged.failures;
+
+        if (judgments.length === 0) {
           progress.stop();
-          console.error(`\nError during judging: ${(error as Error).message}`);
+          console.error('\nError during judging: no judgments completed successfully.');
           process.exit(1);
         }
 
@@ -130,11 +135,22 @@ export function createJudgeCommand(): Command {
             await writeFile(judgmentPath, JSON.stringify(judgment, null, 2), 'utf-8');
           }
 
+          if (judgeFailures.length > 0) {
+            await writeFile(
+              path.join(outputDir, 'judge-failures.json'),
+              JSON.stringify(judgeFailures, null, 2),
+              'utf-8'
+            );
+          }
+ 
           // Save summary
           const summary = {
             inputFile: inputPath,
             judgedAt: new Date().toISOString(),
             judges: judgeModels.map((m) => ({ modelId: m.modelId, friendlyName: m.friendlyName })),
+            failures: {
+              count: judgeFailures.length,
+            },
             result: result
               ? {
                   overallAverage: result.overallAverage,
@@ -144,6 +160,7 @@ export function createJudgeCommand(): Command {
               : null,
           };
           await writeFile(path.join(outputDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
+
         } catch (error) {
           console.error(`Error saving output files: ${(error as Error).message}`);
           process.exit(1);

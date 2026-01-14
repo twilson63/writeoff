@@ -36,9 +36,10 @@ export interface WriterResult {
 
 /**
  * Criteria weights for evaluating blog posts
- * - narrative (40%): Flow, storytelling, engagement
- * - structure (25%): Organization, headings, transitions
+ * - narrative (30%): Flow, storytelling, engagement
+ * - structure (20%): Organization, headings, transitions
  * - audienceFit (20%): Tone, knowledge level
+ * - accuracy (15%): Grounded, non-misleading claims; avoids fabricated specifics; labels hypotheticals
  * - aiDetection (15%): Penalizes AI writing patterns including:
  *   - Phrase-turning/juxtaposition ("It's not X, it's Y")
  *   - Section opener clichés ("Here's the bottom line", "Let me put it to you straight")
@@ -50,6 +51,7 @@ export interface JudgingCriteria {
   narrative: number;
   structure: number;
   audienceFit: number;
+  accuracy: number;
   aiDetection: number;
 }
 
@@ -57,9 +59,10 @@ export interface JudgingCriteria {
  * Criteria weights as percentages (must sum to 100)
  */
 export const CRITERIA_WEIGHTS: Readonly<JudgingCriteria> = {
-  narrative: 40,
-  structure: 25,
+  narrative: 30,
+  structure: 20,
   audienceFit: 20,
+  accuracy: 15,
   aiDetection: 15,
 } as const;
 
@@ -81,9 +84,25 @@ export interface JudgmentResult {
   judgeFriendlyName: string;
   postModelId: string;
   scores: CriterionScore[];
-  /** Weighted overall score based on criteria weights */
+  /** Weighted overall score reported by the judge (advisory). */
   overallScore: number;
+  /** Weighted overall score computed locally from criterion scores + CRITERIA_WEIGHTS. */
+  overallScoreComputed: number;
+  /** Optional warnings about parsing/validation/repairs. */
+  parseWarnings?: string[];
   judgedAt: Date;
+}
+
+/**
+ * Captures a judge failure so runs can complete with partial results.
+ */
+export interface JudgeFailure {
+  judgeModelId: string;
+  judgeFriendlyName: string;
+  postModelId: string;
+  postFriendlyName: string;
+  error: string;
+  failedAt: Date;
 }
 
 // =============================================================================
@@ -122,6 +141,8 @@ export interface WriteoffSession {
   posts: WriterResult[];
   /** Individual judgments from all judges */
   judgments: JudgmentResult[];
+  /** Any judge failures encountered (run continues with partial results). */
+  judgeFailures: JudgeFailure[];
   /** Aggregated results for each post */
   results: AggregatedResult[];
   /** The winning post (highest overall average) or null if no posts */
@@ -140,7 +161,12 @@ export interface FlywheelIteration {
   iteration: number;
   post: WriterResult;
   judgments: JudgmentResult[];
+  /** Any judge failures encountered for this iteration. */
+  judgeFailures: JudgeFailure[];
+  /** Weighted overall score computed locally from criterion scores + CRITERIA_WEIGHTS. */
   averageScore: number;
+  /** Average of judge-reported overallScore values (diagnostic). */
+  averageScoreJudgeReported?: number;
 }
 
 /**
@@ -155,10 +181,14 @@ export interface FlywheelSession {
   writerModel: ModelConfig;
   /** All iterations of refinement */
   iterations: FlywheelIteration[];
-  /** The final refined post or null if process failed */
+  /** The final refined post (by configured policy) or null if process failed */
   finalPost: WriterResult | null;
   /** Final weighted average score */
   finalScore: number;
+  /** Best iteration score encountered */
+  bestScore: number;
+  /** Iteration number (1-based) of best score */
+  bestIteration: number;
   /** Reason the flywheel stopped */
-  stoppedReason: 'threshold' | 'max_iterations';
+  stoppedReason: 'threshold' | 'max_iterations' | 'no_improvement';
 }

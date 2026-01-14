@@ -19,7 +19,7 @@ npm run dev -- generate "Write a blog post about [your topic]"
 ## How It Works
 
 1. **Generate** - Multiple LLMs write blog posts from the same prompt in parallel
-2. **Judge** - Each post is evaluated by multiple LLM judges on four weighted criteria
+2. **Judge** - Each post is evaluated by multiple LLM judges on five weighted criteria
 3. **Rank** - Scores are aggregated and a winner is declared with an ASCII summary
 
 ## Commands
@@ -32,8 +32,8 @@ Run a full writing competition with generation and judging:
 # Basic usage
 npm run dev -- generate "Your prompt here"
 
-# With input file (use existing content as starting point)
-npm run dev -- generate --input ./existing-post.md "Improve this post to be more narrative"
+# With input file + prompt (use file as starting draft)
+npm run dev -- generate "Improve this post to be more narrative" --input ./existing-post.md
 
 # Override models
 npm run dev -- generate --writers "openrouter:openai/gpt-4.1,openrouter:google/gemini-3-flash-preview" "Your prompt"
@@ -57,13 +57,14 @@ npm run dev -- refine ./post.md --max-iterations 100 --threshold 90
 
 ## Judging Criteria
 
-Posts are scored on four weighted criteria:
+Posts are scored on five weighted criteria:
 
 | Criterion | Weight | What It Measures |
 |-----------|--------|------------------|
-| **Narrative** | 40% | Flow, storytelling, engagement, emotional beats |
-| **Structure** | 25% | Organization, headings, transitions, length |
+| **Narrative** | 30% | Flow, storytelling, engagement, emotional beats |
+| **Structure** | 20% | Organization, headings, transitions, length |
 | **Audience Fit** | 20% | Tone, jargon usage, knowledge level assumptions |
+| **Accuracy** | 15% | Grounded, non-misleading claims; avoids invented specifics presented as fact |
 | **AI Detection** | 15% | Penalizes robotic patterns, cliches, over-polish |
 
 ## Environment Configuration
@@ -252,4 +253,4 @@ Thinking models (kimi-k2-thinking, gpt-5.2-pro) take longer. Use standard models
 Add more human imperfections: typos, sentence fragments, tangents, self-deprecating humor, specific timestamps.
 
 ### Parsing errors during judging
-Sometimes judges return malformed JSON. Just re-run the command.
+Sometimes judges return malformed JSON. Writeoff will retry once with a repair prompt and will record any remaining judge failures in the output artifacts.

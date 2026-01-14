@@ -44,13 +44,14 @@ Output shows scores for each criterion:
     { "criterion": "narrative", "score": 68, "feedback": "Opening lacks hook..." },
     { "criterion": "structure", "score": 75, "feedback": "Sections are uniform..." },
     { "criterion": "audienceFit", "score": 72, "feedback": "Tone is appropriate..." },
+    { "criterion": "accuracy", "score": 70, "feedback": "Several claims need grounding..." },
     { "criterion": "aiDetection", "score": 65, "feedback": "Multiple em-dashes detected..." }
   ],
   "overallScore": 70
 }
 ```
 
-**Criteria weights:** Narrative (40%), Structure (25%), Audience Fit (20%), AI Detection (15%)
+**Criteria weights:** Narrative (30%), Structure (20%), Audience Fit (20%), Accuracy (15%), AI Detection (15%)
 
 ## Step 3: Improve with OpenCode
 

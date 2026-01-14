@@ -13,6 +13,7 @@ import { loadEnv, getJudgeModels, validateApiKeys } from '../../config/env.js';
 import { parseModelList, parseModelString } from '../../config/models.js';
 import { runFlywheel } from '../../core/flywheel.js';
 import { createFlywheelProgress } from '../progress.js';
+import { unifiedDiff } from '../../utils/diff.js';
 import type { FlywheelSession, FlywheelIteration } from '../../types/index.js';
 
 // =============================================================================
@@ -28,79 +29,74 @@ const DEFAULT_OUTPUT_DIR = './results';
 // Output Helpers
 // =============================================================================
 
-/**
- * Generate a timestamp string for directory naming
- */
 function generateTimestamp(): string {
   const now = new Date();
   return now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-/**
- * Save all flywheel outputs to the results directory
- */
 async function saveOutputs(
   session: FlywheelSession,
-  outputDir: string
+  outputDir: string,
+  options: { writeDiffs: boolean; diffContext: number }
 ): Promise<string> {
   const timestamp = generateTimestamp();
   const sessionDir = path.join(outputDir, `${timestamp}-refine`);
 
-  // Create directories
   await fs.mkdir(sessionDir, { recursive: true });
   await fs.mkdir(path.join(sessionDir, 'iterations'), { recursive: true });
 
-  // Save original post
-  await fs.writeFile(
-    path.join(sessionDir, 'original.md'),
-    session.originalPost,
-    'utf-8'
-  );
+  const diffsDir = path.join(sessionDir, 'diffs');
+  if (options.writeDiffs) {
+    await fs.mkdir(diffsDir, { recursive: true });
+  }
 
-  // Save each iteration
-  for (const iteration of session.iterations) {
+  await fs.writeFile(path.join(sessionDir, 'original.md'), session.originalPost, 'utf-8');
+
+  for (let i = 0; i < session.iterations.length; i++) {
+    const iteration = session.iterations[i];
     const iterNum = iteration.iteration;
 
-    // Save iteration post
     await fs.writeFile(
       path.join(sessionDir, 'iterations', `${iterNum}.md`),
       iteration.post.content,
       'utf-8'
     );
 
-    // Save iteration judgments
     await fs.writeFile(
       path.join(sessionDir, 'iterations', `${iterNum}-judgments.json`),
-      JSON.stringify(iteration.judgments, null, 2),
+      JSON.stringify(iteration, null, 2),
       'utf-8'
     );
+
+    if (options.writeDiffs && i > 0) {
+      const prev = session.iterations[i - 1];
+      const patch = unifiedDiff(prev.post.content, iteration.post.content, {
+        fromFile: `iterations/${prev.iteration}.md`,
+        toFile: `iterations/${iteration.iteration}.md`,
+        context: options.diffContext,
+      });
+
+      if (patch) {
+        await fs.writeFile(
+          path.join(diffsDir, `${prev.iteration}-${iteration.iteration}.patch`),
+          patch,
+          'utf-8'
+        );
+      }
+    }
   }
 
-  // Save final post
   if (session.finalPost) {
-    await fs.writeFile(
-      path.join(sessionDir, 'final.md'),
-      session.finalPost.content,
-      'utf-8'
-    );
+    await fs.writeFile(path.join(sessionDir, 'final.md'), session.finalPost.content, 'utf-8');
   }
 
-  // Save summary
-  await fs.writeFile(
-    path.join(sessionDir, 'summary.json'),
-    JSON.stringify(session, null, 2),
-    'utf-8'
-  );
+  await fs.writeFile(path.join(sessionDir, 'summary.json'), JSON.stringify(session, null, 2), 'utf-8');
 
   return sessionDir;
 }
 
-/**
- * Print summary of the refinement session
- */
-function printSummary(session: FlywheelSession, outputDir: string): void {
-  const startingScore =
-    session.iterations.length > 0 ? session.iterations[0].averageScore : 0;
+function printSummary(session: FlywheelSession, outputDir: string, keepBest: boolean): void {
+  const startingScore = session.iterations.length > 0 ? session.iterations[0].averageScore : 0;
 
   console.log('\n' + '='.repeat(60));
   console.log('REFINEMENT COMPLETE');
@@ -108,14 +104,24 @@ function printSummary(session: FlywheelSession, outputDir: string): void {
   console.log();
   console.log(`Starting Score:    ${startingScore.toFixed(1)}/100`);
   console.log(`Final Score:       ${session.finalScore.toFixed(1)}/100`);
+  console.log(`Best Score:        ${session.bestScore.toFixed(1)}/100 (iter ${session.bestIteration})`);
   console.log(`Iterations:        ${session.iterations.length}`);
-  console.log(
-    `Stop Reason:       ${
-      session.stoppedReason === 'threshold'
-        ? 'Threshold reached'
-        : 'Max iterations reached'
-    }`
-  );
+
+  const reason =
+    session.stoppedReason === 'threshold'
+      ? 'Threshold reached'
+      : session.stoppedReason === 'no_improvement'
+        ? 'No improvement'
+        : 'Max iterations reached';
+  console.log(`Stop Reason:       ${reason}`);
+
+  if (keepBest && session.bestIteration > 0) {
+    const lastIter = session.iterations[session.iterations.length - 1]?.iteration ?? 0;
+    if (session.bestIteration !== lastIter) {
+      console.log(`Final Post:        Best iteration (iter ${session.bestIteration})`);
+    }
+  }
+
   console.log();
   console.log(`Results saved to:  ${outputDir}`);
   console.log('='.repeat(60));
@@ -125,56 +131,37 @@ function printSummary(session: FlywheelSession, outputDir: string): void {
 // Command Definition
 // =============================================================================
 
-/**
- * Create the refine command for the flywheel refinement process.
- */
 export function createRefineCommand(): Command {
   const command = new Command('refine')
     .description('Iteratively refine a markdown file using AI feedback')
     .argument('<file>', 'Path to markdown file to refine')
-    .option(
-      '--writer <model>',
-      'Writer model for refinement',
-      DEFAULT_WRITER_MODEL
-    )
-    .option(
-      '--judges <models>',
-      'Comma-separated judge models (overrides env)'
-    )
-    .option(
-      '--max-iterations <n>',
-      'Maximum iterations',
-      String(DEFAULT_MAX_ITERATIONS)
-    )
-    .option(
-      '--threshold <n>',
-      'Score threshold to stop',
-      String(DEFAULT_THRESHOLD)
-    )
+    .option('--writer <model>', 'Writer model for refinement', DEFAULT_WRITER_MODEL)
+    .option('--judges <models>', 'Comma-separated judge models (overrides env)')
+    .option('--mode <mode>', 'Refinement mode: blog or generic', 'blog')
+    .option('--max-iterations <n>', 'Maximum iterations', String(DEFAULT_MAX_ITERATIONS))
+    .option('--threshold <n>', 'Score threshold to stop', String(DEFAULT_THRESHOLD))
+    .option('--no-keep-best', 'Use last iteration as final post')
+    .option('--min-improvement <n>', 'Minimum score improvement to reset patience', '0')
+    .option('--patience <n>', 'Stop after N non-improving iterations (0 disables)', '0')
+    .option('--diff', 'Write unified diffs between iterations')
+    .option('--diff-context <n>', 'Unified diff context lines', '3')
     .option('-o, --output <dir>', 'Output directory', DEFAULT_OUTPUT_DIR)
     .action(async (filePath: string, options) => {
       try {
-        // Load environment and validate API keys
         loadEnv();
         const keyValidation = validateApiKeys();
         if (!keyValidation.valid) {
-          console.error(
-            'Error: No API keys configured. Please set at least one of:',
-            keyValidation.missing.join(', ')
-          );
+          console.error('Error: No API keys configured. Please set at least one of:', keyValidation.missing.join(', '));
           process.exit(1);
         }
 
-        // Resolve and read the input file
         const absolutePath = path.resolve(filePath);
         let fileContent: string;
         try {
           fileContent = await fs.readFile(absolutePath, 'utf-8');
         } catch (err) {
           console.error(`Error: Unable to read file "${filePath}"`);
-          if (err instanceof Error) {
-            console.error(err.message);
-          }
+          if (err instanceof Error) console.error(err.message);
           process.exit(1);
         }
 
@@ -183,7 +170,6 @@ export function createRefineCommand(): Command {
           process.exit(1);
         }
 
-        // Parse writer model
         let writerModel;
         try {
           writerModel = parseModelString(options.writer);
@@ -192,16 +178,12 @@ export function createRefineCommand(): Command {
           process.exit(1);
         }
 
-        // Parse judge models
-        let judgeModelStrings: string[];
-        if (options.judges) {
-          judgeModelStrings = options.judges
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter((s: string) => s.length > 0);
-        } else {
-          judgeModelStrings = getJudgeModels();
-        }
+        const judgeModelStrings: string[] = options.judges
+          ? options.judges
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0)
+          : getJudgeModels();
 
         let judgeModels;
         try {
@@ -216,7 +198,6 @@ export function createRefineCommand(): Command {
           process.exit(1);
         }
 
-        // Parse numeric options
         const maxIterations = parseInt(options.maxIterations, 10);
         if (isNaN(maxIterations) || maxIterations < 1) {
           console.error('Error: --max-iterations must be a positive integer');
@@ -229,58 +210,87 @@ export function createRefineCommand(): Command {
           process.exit(1);
         }
 
-        // Display configuration
+        const minImprovement = Number.parseFloat(options.minImprovement);
+        if (!Number.isFinite(minImprovement) || minImprovement < 0) {
+          console.error('Error: --min-improvement must be a non-negative number');
+          process.exit(1);
+        }
+
+        const patience = parseInt(options.patience, 10);
+        if (isNaN(patience) || patience < 0) {
+          console.error('Error: --patience must be a non-negative integer');
+          process.exit(1);
+        }
+
+        const diffContext = parseInt(options.diffContext, 10);
+        if (isNaN(diffContext) || diffContext < 0 || diffContext > 20) {
+          console.error('Error: --diff-context must be an integer between 0 and 20');
+          process.exit(1);
+        }
+
+        const mode = String(options.mode ?? 'blog').toLowerCase();
+        if (mode !== 'blog' && mode !== 'generic') {
+          console.error('Error: --mode must be either "blog" or "generic"');
+          process.exit(1);
+        }
+        const refinementMode = mode as 'blog' | 'generic';
+
+        const keepBest = Boolean(options.keepBest);
+        const writeDiffs = Boolean(options.diff);
+
         console.log('\nStarting flywheel refinement...');
         console.log(`  Input:          ${filePath}`);
         console.log(`  Writer:         ${writerModel.friendlyName} (${writerModel.provider})`);
+        console.log(`  Mode:           ${refinementMode}`);
         console.log(`  Judges:         ${judgeModels.map((m) => m.friendlyName).join(', ')}`);
         console.log(`  Max Iterations: ${maxIterations}`);
         console.log(`  Threshold:      ${threshold}/100`);
+        console.log(`  Keep Best:      ${keepBest ? 'yes' : 'no'}`);
+        console.log(`  Patience:       ${patience} (min improvement: ${minImprovement})`);
+        console.log(`  Diffs:          ${writeDiffs ? `yes (context=${diffContext})` : 'no'}`);
         console.log(`  Output:         ${options.output}`);
         console.log();
 
-        // Create progress bar
         const progress = createFlywheelProgress(maxIterations);
         let lastScore = 0;
-
         progress.start();
 
-        // Run the flywheel
         const session = await runFlywheel({
           initialPost: fileContent,
           writerModel,
           judgeModels,
           maxIterations,
           threshold,
+          refinementMode,
+          keepBest,
+          minImprovement,
+          patience,
           onIteration: (iteration: FlywheelIteration) => {
             const improvement = iteration.averageScore - lastScore;
             const improvementStr =
-              lastScore > 0
-                ? ` (${improvement >= 0 ? '+' : ''}${improvement.toFixed(1)})`
-                : '';
+              lastScore > 0 ? ` (${improvement >= 0 ? '+' : ''}${improvement.toFixed(1)})` : '';
             lastScore = iteration.averageScore;
+
+            const failuresSuffix = iteration.judgeFailures.length
+              ? ` | ${iteration.judgeFailures.length} judge failure(s)`
+              : '';
 
             progress.update(
               iteration.iteration,
-              `Score: ${iteration.averageScore.toFixed(1)}${improvementStr}`
+              `Score: ${iteration.averageScore.toFixed(1)}${improvementStr}${failuresSuffix}`
             );
           },
         });
 
         progress.stop();
 
-        // Save outputs
-        const outputDir = await saveOutputs(session, options.output);
-
-        // Print summary
-        printSummary(session, outputDir);
+        const outputDir = await saveOutputs(session, options.output, { writeDiffs, diffContext });
+        printSummary(session, outputDir, keepBest);
       } catch (err) {
         console.error('\nError during refinement:');
         if (err instanceof Error) {
           console.error(err.message);
-          if (process.env.DEBUG) {
-            console.error(err.stack);
-          }
+          if (process.env.DEBUG) console.error(err.stack);
         } else {
           console.error(err);
         }

@@ -7,6 +7,8 @@ import type { WriterResult, ModelConfig } from '../types/index.js';
 import { generate } from '../providers/ai.js';
 import { WRITER_SYSTEM_PROMPT, getWriterPrompt } from '../prompts/writer.js';
 import { parseModelString } from '../config/models.js';
+import { getMaxConcurrency } from '../config/env.js';
+import { pLimit } from '../utils/limit.js';
 
 /**
  * Generate a blog post using a specific model.
@@ -63,7 +65,8 @@ export async function generatePostsFromModels(
     }
   };
 
-  const results = await Promise.all(models.map(generateWithProgress));
+  const limit = pLimit(getMaxConcurrency());
+  const results = await Promise.all(models.map((model) => limit(() => generateWithProgress(model))));
 
   // Filter out failed generations (nulls)
   return results.filter((result): result is WriterResult => result !== null);

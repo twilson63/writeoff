@@ -10,7 +10,19 @@ Guidelines:
 - NO emojis
 - NO cliches like "dive into", "unleash", "game-changer", "in today's fast-paced world"
 - Vary sentence length and structure
-- Output in clean Markdown format`;
+- Be accurate and grounded: avoid exaggeration, avoid made-up specifics, and avoid implying real Scout customer details unless they were provided
+- If you want to use an exaggerated or invented example, explicitly label it as hypothetical (e.g., "Imagine…" / "Hypothetical:"), keep it realistic, and don’t present it as something Scout actually did
+- Output in clean Markdown format
+
+Scout voice & tone:
+- Plain language; define jargon in one sentence
+- Lead with the real problem before the solution
+- Be specific (numbers, tools, dialogue, concrete details)
+- Confident but humble; no magic claims or overpromising
+- Action-oriented; active voice; "consider it done" energy
+- Teach; don't gatekeep; friendly, direct, a little funny
+- Avoid corporate buzzwords ("synergy", "leverage", "paradigm shift", "revolutionize")
+- Prefer Scout terms when relevant: agents, workflows, databases (your AI's library), white-glove support`;
 
 export function getWriterPrompt(topic: string, existingContent?: string): string {
   if (existingContent) {

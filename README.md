@@ -31,6 +31,10 @@ ANTHROPIC_API_KEY=your-anthropic-key
 # Optional: Override default models
 WRITER_MODELS=openrouter:openai/gpt-5.2,openrouter:anthropic/claude-opus-4.5
 JUDGE_MODELS=openrouter:openai/gpt-5.2,openrouter:moonshotai/kimi-k2-thinking
+
+# Optional: Reliability knobs
+WRITEOFF_MAX_CONCURRENCY=5
+WRITEOFF_MAX_RETRIES=2
 ```
 
 ## Usage
@@ -41,8 +45,11 @@ JUDGE_MODELS=openrouter:openai/gpt-5.2,openrouter:moonshotai/kimi-k2-thinking
 # From a prompt
 writeoff generate "Write a blog post about the future of remote work"
 
-# From a markdown file
+# From a markdown file (treat file as the prompt)
 writeoff generate --input ./prompt.md
+
+# With a starting draft (treat file as existing content)
+writeoff generate "Improve this draft to be more narrative" --input ./draft.md
 
 # With custom models
 writeoff generate "Your prompt" \
@@ -67,13 +74,14 @@ writeoff refine ./path/to/post.md
 
 ## Judging Criteria
 
-Posts are evaluated on four criteria with weighted scoring:
+Posts are evaluated on five criteria with weighted scoring:
 
 | Criterion | Weight | Description |
 |-----------|--------|-------------|
-| **Narrative Flow** | 40% | Compelling story, smooth transitions, maintains reader interest |
-| **Structure** | 25% | Clear organization, proper introduction/body/conclusion |
+| **Narrative Flow** | 30% | Compelling story, smooth transitions, maintains reader interest |
+| **Structure** | 20% | Clear organization, proper introduction/body/conclusion |
 | **Audience Fit** | 20% | Appropriate tone, educational yet entertaining |
+| **Accuracy** | 15% | Grounded, non-misleading claims; avoid invented specifics presented as fact |
 | **AI Detection** | 15% | Natural, human-like writing without AI patterns |
 
 ### AI Detection Signals

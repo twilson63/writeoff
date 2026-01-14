@@ -2,13 +2,14 @@
 
 ## Judging Criteria & Weights
 
-Each post is evaluated on **4 criteria** with weighted scores:
+Each post is evaluated on **5 criteria** with weighted scores:
 
 | Criterion | Weight | What It Measures |
 |-----------|--------|------------------|
-| **Narrative** | 40% | Flow, storytelling, engagement, transitions, reader interest |
-| **Structure** | 25% | Organization, intro/body/conclusion, appropriate length |
+| **Narrative** | 30% | Flow, storytelling, engagement, transitions, reader interest |
+| **Structure** | 20% | Organization, intro/body/conclusion, appropriate length |
 | **Audience Fit** | 20% | Tone consistency, entertainment + education balance |
+| **Accuracy** | 15% | Grounded, non-misleading claims; avoids invented specifics presented as fact |
 | **AI Detection** | 15% | Natural/human feel, penalizes repetitive patterns, generic phrasing, lack of personality |
 
 ## Judge System Prompt
@@ -45,6 +46,7 @@ should score between 60-80.
 │   │       score: 88, feedback: "..."},      │              │
 │   │      {criterion: "structure", ...},     │              │
 │   │      {criterion: "audienceFit", ...},   │              │
+│   │      {criterion: "accuracy", ...},      │              │
 │   │      {criterion: "aiDetection", ...}    │              │
 │   │    ],                                   │              │
 │   │    overallScore: 85                     │              │
@@ -61,8 +63,9 @@ should score between 60-80.
 │    averageScore = sum(all judge scores) / num_judges        │
 │                                                             │
 │  Overall weighted average:                                  │
-│    = (narrative × 0.40) + (structure × 0.25)               │
-│      + (audienceFit × 0.20) + (aiDetection × 0.15)         │
+│    = (narrative × 0.30) + (structure × 0.20)               │
+│      + (audienceFit × 0.20) + (accuracy × 0.15)            │
+│      + (aiDetection × 0.15)                                 │
 └─────────────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -85,11 +88,12 @@ From iteration 3 of the "Morning Everything Changed" writeoff, Claude Opus 4 rec
 
 | Criterion | Score | Weight | Contribution |
 |-----------|-------|--------|--------------|
-| Narrative | 88/100 | ×0.40 | 35.20 |
-| Structure | 87/100 | ×0.25 | 21.75 |
+| Narrative | 88/100 | ×0.30 | 26.40 |
+| Structure | 87/100 | ×0.20 | 17.40 |
 | Audience Fit | 88/100 | ×0.20 | 17.60 |
+| Accuracy | 86/100 | ×0.15 | 12.90 |
 | AI Detection | 84/100 | ×0.15 | 12.60 |
-| **Total** | | | **87.15%** |
+| **Total** | | | **86.90%** |
 
 ## Source Files
 

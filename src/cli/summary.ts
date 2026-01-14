@@ -3,14 +3,9 @@
  */
 
 import type { AggregatedResult, JudgingCriteria } from '../types/index.js';
+import { CRITERIA_WEIGHTS } from '../types/index.js';
 
-// Re-import the weights value (not just type)
-const WEIGHTS: Readonly<JudgingCriteria> = {
-  narrative: 40,
-  structure: 25,
-  audienceFit: 20,
-  aiDetection: 15,
-} as const;
+const WEIGHTS: Readonly<JudgingCriteria> = CRITERIA_WEIGHTS;
 
 // Box drawing characters
 const BOX_DOUBLE_HORIZONTAL = '=';
@@ -106,6 +101,7 @@ function formatCriterionName(criterion: keyof JudgingCriteria): string {
     narrative: 'Narrative',
     structure: 'Structure',
     audienceFit: 'Audience',
+    accuracy: 'Accuracy',
     aiDetection: 'AI Detection',
   };
   return names[criterion];
@@ -173,7 +169,7 @@ export function renderSummary(options: RenderSummaryOptions): string {
     lines.push(contentLine('-'.repeat(innerWidth - 2), width));
     
     // Show each criterion with weight and score
-    const criteria: (keyof JudgingCriteria)[] = ['narrative', 'structure', 'audienceFit', 'aiDetection'];
+    const criteria: (keyof JudgingCriteria)[] = ['narrative', 'structure', 'audienceFit', 'accuracy', 'aiDetection'];
     
     for (const criterion of criteria) {
       const weight = WEIGHTS[criterion];
