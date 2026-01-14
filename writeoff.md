@@ -32,7 +32,10 @@ Run a full writing competition with generation and judging:
 # Basic usage
 npm run dev -- generate "Your prompt here"
 
-# With input file + prompt (use file as starting draft)
+# Use a file as the *prompt* (backwards compatible behavior)
+npm run dev -- generate --input ./prompt.md
+
+# Use a file as a *starting draft* (file content) + provide improvement prompt as CLI arg
 npm run dev -- generate "Improve this post to be more narrative" --input ./existing-post.md
 
 # Override models
@@ -52,7 +55,11 @@ npm run dev -- judge ./my-post.md
 Iteratively improve a post until it hits a score threshold:
 
 ```bash
+# Basic
 npm run dev -- refine ./post.md --max-iterations 100 --threshold 90
+
+# Keep the best iteration (even if later iterations regress), stop on plateaus, and write diffs
+npm run dev -- refine ./post.md --threshold 90 --patience 3 --min-improvement 0.5 --diff
 ```
 
 ## Judging Criteria
@@ -66,6 +73,13 @@ Posts are scored on five weighted criteria:
 | **Audience Fit** | 20% | Tone, jargon usage, knowledge level assumptions |
 | **Accuracy** | 15% | Grounded, non-misleading claims; avoids invented specifics presented as fact |
 | **AI Detection** | 15% | Penalizes robotic patterns, cliches, over-polish |
+
+## Scoring & Output Rules
+
+- **Computed scoring is authoritative**: Writeoff computes `overallScoreComputed` locally from the five criterion scores + weights and uses that for ranking and flywheel thresholds.
+- **Judge-reported overall is diagnostic**: judges still return `overallScore`, but it’s treated as advisory and Writeoff records a warning if it differs materially from the computed value.
+- **Strict JSON validation + auto-repair**: if a judge returns malformed JSON or missing criteria, Writeoff retries once with a repair prompt.
+- **Partial results are kept**: if some judge calls fail, the run continues and failures are written to `judge-failures.json`.
 
 ## Environment Configuration
 
@@ -83,6 +97,12 @@ WRITER_MODELS=openrouter:google/gemini-3-flash-preview,openrouter:moonshotai/kim
 
 # Judge models (can be same or different)
 JUDGE_MODELS=openrouter:google/gemini-3-flash-preview,openrouter:moonshotai/kimi-k2,openrouter:openai/gpt-4.1
+
+# Reliability knobs
+WRITEOFF_MAX_CONCURRENCY=5
+WRITEOFF_MAX_RETRIES=2
+WRITEOFF_RETRY_BASE_MS=500
+WRITEOFF_RETRY_MAX_MS=8000
 ```
 
 ### Model Format
@@ -100,14 +120,17 @@ Results are saved to `./results/{timestamp}/`:
 
 ```
 results/20260106-123456/
-├── prompt.md           # The original prompt
+├── prompt.md              # The original prompt
 ├── posts/
-│   ├── gpt-4-1.md      # Each model's generated post
+│   ├── gpt-4-1.md         # Each model's generated post
 │   ├── gemini-3-flash-preview.md
 │   └── kimi-k2.md
-├── judgments/          # Raw judgment data
-└── summary.json        # Full session data with scores
+├── judgments/             # Raw judgment data (grouped by judge)
+├── judge-failures.json    # Optional: any judge errors (partial results still saved)
+└── summary.json           # Full session data with scores
 ```
+
+Refine sessions are saved to `./results/{timestamp}-refine/` and include `iterations/` plus optional `diffs/*.patch` when `--diff` is enabled.
 
 ## Iteration Strategy for Higher Scores
 
@@ -140,12 +163,13 @@ npm run dev -- generate "Your detailed prompt"
 cat results/*/summary.json | jq '.results[0]'
 
 # 3. Iterate with the winning post as input
-npm run dev -- generate --input ./results/*/posts/winner.md "
+# (Provide the improvement prompt as the CLI arg, and pass the draft via --input)
+npm run dev -- generate "
 Score: 85. Target: 89+
 
 Keep: [what's working]
 Improve: [specific changes needed]
-"
+" --input ./results/*/posts/winner.md
 
 # 4. Repeat until scores plateau (usually around 88-90)
 ```
@@ -235,11 +259,11 @@ src/
 ## Tips for Agents
 
 1. **Start with a detailed prompt** - More context = better posts
-2. **Use --input for iterations** - Feed the winning post back in with improvement instructions
-3. **Check AI Detection score** - This is usually the bottleneck
-4. **Add specifics in iteration prompts** - "Add a timestamp like 'at 2:47 PM'" works better than "add more details"
-5. **Don't over-iterate** - Scores plateau around 88-90; diminishing returns after 3-4 iterations
-6. **Save good posts** - The results folder has all generated content
+2. **Use `--input` correctly for iterations** - Pass the draft via `--input`, and put improvement instructions in the CLI prompt string
+3. **Check `AI Detection` and `Accuracy`** - These are common bottlenecks for “human reader” quality
+4. **Add grounded specifics** - timestamps, tools, real constraints, and clearly-labeled hypotheticals
+5. **Don’t over-iterate** - use `--patience` / `--min-improvement` to stop when you plateau
+6. **Tune reliability** - increase `WRITEOFF_MAX_CONCURRENCY` cautiously; retries help but can increase cost
 
 ## Troubleshooting
 
